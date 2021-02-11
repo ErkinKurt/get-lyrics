@@ -17,6 +17,9 @@ const Home = () => {
       setError(error);
       return;
     }
+    if (song.name !== name) {
+      setLyrics("");
+    }
     setSong({
       name,
       artistNames: artistNames.join(", "),
@@ -41,7 +44,7 @@ const Home = () => {
   };
 
   return (
-    <div>
+    <div style={{ margin: 20 }}>
       <h1>Login Spotify</h1>
       {user || <button onClick={redirectToSpotify}>Signin To Spotify</button>}
       {user || <button onClick={signout}>Signout</button>}
