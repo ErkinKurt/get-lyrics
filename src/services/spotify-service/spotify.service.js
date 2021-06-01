@@ -1,5 +1,6 @@
 import Axios from "axios";
 import STORAGE_KEYS from "../../constants/storageKeys";
+import AuthorizationError from '../../core/errors/AuthorizeError';
 
 const spotifyAxios = Axios.create({ baseURL: "https://api.spotify.com" });
 
@@ -33,7 +34,9 @@ export const getCurrentSong = async () => {
       name,
     };
   } catch (e) {
-    console.log(e);
+    if (e.response.status === 401) {
+      throw new AuthorizationError();
+    }
   }
 };
 

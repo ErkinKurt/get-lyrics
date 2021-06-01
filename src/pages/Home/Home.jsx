@@ -1,30 +1,68 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import useProviderAuth from "../../contexts/authContext/useProviderAuth";
 import { getLyrics } from "../../services/scrapper/scrapper.service";
+import AuthorizationError from '../../core/errors/AuthorizeError';
 import { getCurrentSong } from "../../services/spotify-service/spotify.service";
+
+const TIMER = 60000;
 
 const Home = () => {
   const { redirectToSpotify, user, signout } = useProviderAuth();
   const [loading, setLoading] = useState(false);
   const [song, setSong] = useState({ name: "", artistNames: "" });
+  const [autoFetchEnabled, setAutoFetch] = useState(true);
   const [error, setError] = useState("");
   const [lyrics, setLyrics] = useState();
+  const [text, setText] = useState({ name: '', artistNames: ''});
 
-  const getSong = async () => {
-    setLoading(true);
-    const { error: requestError, artistNames, name } = await getCurrentSong();
-    if (requestError) {
-      setError(error);
-      return;
-    }
-    if (song.name !== name) {
-      setLyrics("");
-    }
+  const submitForm = () => {
+    const { name, artistNames } = text;
+    setAutoFetch(false);
     setSong({
       name,
-      artistNames: artistNames.join(", "),
+      artistNames
     });
-    setLoading(false);
+  }
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (autoFetchEnabled) {
+        await getSong();
+      }
+    }, TIMER);
+    return () => clearInterval(interval);
+  }, [song.name, autoFetchEnabled])
+
+  useEffect(() => {
+    if (song.name) {
+      getCurrentLyrics();
+    }
+  }, [song.name]);
+
+  const getSong = async () => {
+    if (!autoFetchEnabled) { setAutoFetch(true);}
+    setLoading(true);
+    try {
+      const { error: requestError, artistNames, name } = await getCurrentSong();
+      if (requestError) {
+        setError(error);
+        return;
+      }
+      if (song.name !== name) {
+        setSong({
+          name,
+          artistNames: artistNames.join(", "),
+        });
+      }
+    } catch (e) {
+      if (e instanceof AuthorizationError) {
+        console.log('redirect');
+        redirectToSpotify();
+      }
+    } finally {
+      setLoading(false);
+    }
+    
   };
 
   const getCurrentLyrics = async () => {
@@ -34,7 +72,9 @@ const Home = () => {
         song.name,
         song.artistNames
       );
-      setLyrics(JSON.parse(currentLyrics));
+      if (currentLyrics && provider) {
+        setLyrics(JSON.parse(currentLyrics));
+      }
       setLoading(false);
     } catch (e) {
       console.log(e);
@@ -48,8 +88,14 @@ const Home = () => {
       <h1>Login Spotify</h1>
       {user || <button onClick={redirectToSpotify}>Signin To Spotify</button>}
       {user || <button onClick={signout}>Signout</button>}
-      {user || <button onClick={getSong}>Get Song</button>}
-      {user || <button onClick={getCurrentLyrics}>Get Current Lyrics</button>}
+      {user || <button onClick={getSong}>Get Current Song</button>}
+      <div>
+        <label>Artist</label>
+        <input type="text" onChange={(t) => setText({...text, artistNames: t.target.value})} />
+        <label>Song</label>
+        <input type="text" onChange={(t) => setText({...text, name: t.target.value})} />
+        <button onClick={submitForm}>Requset</button>
+      </div>
       <div>
         <h3>{song.name}</h3>
         <h3>{song.artistNames}</h3>
